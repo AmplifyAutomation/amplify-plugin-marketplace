@@ -1,0 +1,18 @@
+{
+  "name": "Amplify Plugin Marketplace",
+  "version": "1.0.0",
+  "description": "A curated collection of Claude Code plugins",
+  "plugins": [
+    {
+      "name": "web-app-dev",
+      "displayName": "Web App Plugin",
+      "description": "A sample plugin that builds responsive, beautify react and next.js apps with supabase on docker compose",
+      "source": "./web-app-dev"
+    }
+  ],
+  "metadata": {
+    "lastUpdated": "2025-01-07T00:00:00Z",
+    "totalPlugins": 1,
+    "maintainer": "Russell Adcock"
+  }
+}

@@ -1,0 +1,25 @@
+# Claude Code local settings
+.claude/*.local.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Node modules (if using MCP servers)
+node_modules/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+
+./claude/settings.local.json
