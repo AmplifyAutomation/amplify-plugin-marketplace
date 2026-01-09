@@ -1,0 +1,322 @@
+# Deployment Guide
+
+## {{PROJECT_NAME}} - Production Deployment
+
+This guide covers deploying your application to a Digital Ocean Droplet (or any Ubuntu-based VPS).
+
+## Prerequisites
+
+- A domain name pointing to your server's IP address
+- SSH access to your server
+- Basic familiarity with Linux command line
+
+## Digital Ocean Droplet Setup
+
+### 1. Create a Droplet
+
+1. Log in to Digital Ocean
+2. Create a new Droplet:
+   - **Image**: Ubuntu 22.04 LTS
+   - **Plan**: Basic - $12/mo (2GB RAM minimum recommended)
+   - **Datacenter**: Choose closest to your users
+   - **Authentication**: SSH keys (recommended)
+   - **Hostname**: {{PROJECT_NAME}}
+
+### 2. Initial Server Setup
+
+SSH into your server:
+
+```bash
+ssh root@your_server_ip
+```
+
+Create a deploy user:
+
+```bash
+# Create user
+adduser deploy
+usermod -aG sudo deploy
+
+# Set up SSH for deploy user
+mkdir -p /home/deploy/.ssh
+cp ~/.ssh/authorized_keys /home/deploy/.ssh/
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
+```
+
+### 3. Install Docker
+
+```bash
+# Update system
+apt update && apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Add deploy user to docker group
+usermod -aG docker deploy
+
+# Install Docker Compose
+apt install docker-compose-plugin -y
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+### 4. Configure Firewall
+
+```bash
+# Enable UFW
+ufw allow OpenSSH
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw enable
+```
+
+### 5. Set Up Application Directory
+
+```bash
+# Switch to deploy user
+su - deploy
+
+# Create application directory
+mkdir -p ~/apps/{{PROJECT_NAME}}
+cd ~/apps/{{PROJECT_NAME}}
+```
+
+## Deploy Application
+
+### 1. Transfer Files
+
+From your local machine:
+
+```bash
+# Option A: Using Git (recommended)
+# On server:
+git clone your-repo-url ~/apps/{{PROJECT_NAME}}
+
+# Option B: Using rsync
+rsync -avz --exclude 'node_modules' --exclude '.next' \
+  ./ deploy@your_server_ip:~/apps/{{PROJECT_NAME}}/
+```
+
+### 2. Create Production Environment File
+
+```bash
+cd ~/apps/{{PROJECT_NAME}}
+cp .env.example .env.production
+nano .env.production
+```
+
+Update with production values:
+
+```env
+# Database
+DB_USER=your_db_user
+DB_PASSWORD=your_secure_password
+DB_NAME={{PROJECT_NAME}}_prod
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+
+# App
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+NODE_ENV=production
+
+# Add other secrets as needed
+```
+
+### 3. Set Up Nginx Configuration
+
+Create `docker/nginx/conf.d/app.conf`:
+
+```nginx
+upstream nextjs {
+    server app:3000;
+}
+
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com www.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    location / {
+        proxy_pass http://nextjs;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Static files caching
+    location /_next/static {
+        proxy_pass http://nextjs;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}
+```
+
+### 4. Obtain SSL Certificate
+
+First, start nginx with HTTP only:
+
+```bash
+# Create initial nginx config for HTTP only
+# Then run certbot to obtain certificate
+
+docker compose -f docker-compose.prod.yml run --rm certbot \
+  certonly --webroot --webroot-path=/var/www/certbot \
+  --email your@email.com --agree-tos --no-eff-email \
+  -d yourdomain.com -d www.yourdomain.com
+```
+
+### 5. Start Application
+
+```bash
+# Build and start containers
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Check logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Verify containers are running
+docker compose -f docker-compose.prod.yml ps
+```
+
+## Maintenance
+
+### View Logs
+
+```bash
+# All services
+docker compose -f docker-compose.prod.yml logs -f
+
+# Specific service
+docker compose -f docker-compose.prod.yml logs -f app
+```
+
+### Update Application
+
+```bash
+cd ~/apps/{{PROJECT_NAME}}
+
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### Database Backup
+
+```bash
+# Create backup
+docker compose -f docker-compose.prod.yml exec db \
+  pg_dump -U $DB_USER $DB_NAME > backups/backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restore backup
+docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U $DB_USER $DB_NAME < backups/your_backup.sql
+```
+
+### SSL Certificate Renewal
+
+Certbot container automatically renews certificates. To manually renew:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm certbot renew
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+## Monitoring
+
+### Basic Health Check
+
+```bash
+curl -f http://localhost:3000/api/health || echo "App is down!"
+```
+
+### Set Up Monitoring (Optional)
+
+Consider setting up:
+- **Uptime monitoring**: UptimeRobot, Better Uptime
+- **Error tracking**: Sentry
+- **Log aggregation**: Papertrail, Logtail
+- **Server metrics**: Netdata, Digital Ocean Monitoring
+
+## Troubleshooting
+
+### Container won't start
+
+```bash
+# Check logs
+docker compose -f docker-compose.prod.yml logs app
+
+# Check container status
+docker compose -f docker-compose.prod.yml ps
+
+# Rebuild from scratch
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml up -d --build --force-recreate
+```
+
+### Database connection issues
+
+```bash
+# Check database is running
+docker compose -f docker-compose.prod.yml exec db pg_isready
+
+# Check connection from app container
+docker compose -f docker-compose.prod.yml exec app nc -zv db 5432
+```
+
+### Nginx SSL issues
+
+```bash
+# Test nginx config
+docker compose -f docker-compose.prod.yml exec nginx nginx -t
+
+# Reload nginx
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+## Security Checklist
+
+- [ ] SSH key authentication only (disable password auth)
+- [ ] Firewall configured (UFW)
+- [ ] SSL certificate installed
+- [ ] Environment variables secured
+- [ ] Database not exposed to internet
+- [ ] Regular backups configured
+- [ ] Security updates enabled (unattended-upgrades)
+- [ ] Strong database passwords
+- [ ] Application secrets rotated regularly

@@ -1,0 +1,127 @@
+# Claude Progress Log
+# Project: {{PROJECT_NAME}}
+# Created: {{DATE}}
+#
+# This file tracks the progress of Claude coding sessions.
+# Each session should add an entry documenting what was done
+# and what should be done next.
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+Project Name: {{PROJECT_NAME}}
+Description: {{PROJECT_DESCRIPTION}}
+Framework: {{FRAMEWORK}}
+Status: INITIALIZED
+
+================================================================================
+SESSION HISTORY
+================================================================================
+
+### Session 1 - Project Initialization ({{DATE}})
+Agent: webapp-initializer
+Status: COMPLETED
+
+#### Actions Taken:
+- Created project directory structure
+- Generated feature specifications (docs/FEATURES.md)
+- Set up Docker Compose for local development
+- Created production deployment configuration
+- Created initialization scripts
+- Initialized git repository with initial commit
+
+#### Files Created:
+{{FILES_CREATED}}
+
+#### Project Structure:
+```
+{{PROJECT_NAME}}/
+├── .claude/
+│   └── progress/
+│       └── claude-progress.txt   # This file
+├── docker/
+│   ├── Dockerfile.dev
+│   ├── Dockerfile.prod
+│   └── nginx/
+├── scripts/
+│   ├── init.sh
+│   ├── dev.sh
+│   └── deploy.sh
+├── docs/
+│   ├── FEATURES.md
+│   ├── ARCHITECTURE.md
+│   └── DEPLOYMENT.md
+├── docker-compose.yml
+├── docker-compose.prod.yml
+├── .env.example
+└── README.md
+```
+
+#### Environment:
+- Docker Compose configured
+- PostgreSQL database ready
+- Development server: http://localhost:3000
+- Database UI: http://localhost:8080 (Adminer)
+
+#### Next Steps for Coding Agent:
+1. Initialize Next.js/React application in the project root
+2. Install and configure Tailwind CSS
+3. Set up the database schema with Prisma/Drizzle
+4. Implement authentication flow
+5. Create base layout components
+6. Begin work on first feature: {{FIRST_FEATURE}}
+
+#### Notes for Next Session:
+- Run `./scripts/init.sh` to start the development environment
+- Update `.env` with actual database credentials
+- Review docs/FEATURES.md for full feature requirements
+
+---
+
+### Session 2 - [PENDING]
+Agent: webapp-coding
+Status: NOT STARTED
+
+[Next coding session will update this section]
+
+---
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+## Development Commands
+```bash
+# Start development
+./scripts/init.sh           # First time setup
+docker compose up -d        # Start containers
+docker compose logs -f      # View logs
+docker compose down         # Stop containers
+
+# Inside container
+docker compose exec app npm run dev
+docker compose exec app npm run build
+docker compose exec app npm run lint
+
+# Database
+docker compose exec db psql -U postgres -d {{PROJECT_NAME}}_dev
+```
+
+## Feature Status Summary
+| Feature | Priority | Status | Progress |
+|---------|----------|--------|----------|
+{{FEATURE_STATUS_TABLE}}
+
+## Active Blockers
+- None currently
+
+## Technical Decisions Log
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| {{FRAMEWORK}} | {{FRAMEWORK_RATIONALE}} | {{DATE}} |
+| PostgreSQL | Reliable, feature-rich, good tooling | {{DATE}} |
+| Docker Compose | Consistent dev environment, easy deployment | {{DATE}} |
+
+================================================================================
+END OF PROGRESS LOG
+================================================================================

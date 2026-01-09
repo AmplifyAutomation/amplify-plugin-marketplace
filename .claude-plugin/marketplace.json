@@ -4,14 +4,14 @@
   "description": "A curated collection of Claude Code plugins",
   "plugins": [
     {
-      "name": "web-app-dev",
-      "displayName": "Web App Plugin",
-      "description": "A sample plugin that builds responsive, beautify react and next.js apps with supabase on docker compose",
-      "source": "./web-app-dev"
+      "name": "webapp-dev",
+      "displayName": "Web App Development Plugin",
+      "description": "Two-stage agent system for building high-quality React and Next.js apps with Docker Compose local deployment and cloud-ready infrastructure",
+      "source": "./webapp-dev"
     }
   ],
   "metadata": {
-    "lastUpdated": "2025-01-07T00:00:00Z",
+    "lastUpdated": "2025-01-08T00:00:00Z",
     "totalPlugins": 1,
     "maintainer": "Russell Adcock"
   }
