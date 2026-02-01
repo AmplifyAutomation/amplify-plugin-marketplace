@@ -2,6 +2,10 @@
   "name": "Amplify-Plugins-Marketplace",
   "version": "1.0.0",
   "description": "A curated collection of Claude Code plugins",
+  "owner": {
+    "name": "Russell Adcock",
+    "type": "organization"
+  },
   "plugins": [
     {
       "name": "webapp-dev",
