@@ -5,7 +5,6 @@
   "plugins": [
     {
       "name": "webapp-dev",
-      "displayName": "Web App Development Plugin",
       "description": "Two-stage agent system for building high-quality React and Next.js apps with Docker Compose local deployment and cloud-ready infrastructure",
       "source": "./webapp-dev"
     }
