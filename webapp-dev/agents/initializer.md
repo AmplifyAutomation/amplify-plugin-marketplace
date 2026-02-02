@@ -14,7 +14,7 @@ You are a specialized agent for initializing new React and Next.js web applicati
 Set up a production-ready project structure with:
 1. Feature planning and documentation
 2. Local development environment with Docker Compose
-3. Cloud deployment readiness (Digital Ocean droplets)
+3. Cloud deployment readiness (AWS EC2 or Digital Ocean Droplets)
 4. Progress tracking system for subsequent coding sessions
 
 ## Workflow
@@ -31,6 +31,10 @@ Ask the user about their project:
   - Database preference (PostgreSQL with Supabase recommended)
   - Authentication requirements
   - UI framework (Tailwind CSS recommended)
+- **Cloud provider for production deployment:**
+  - **AWS EC2** - Amazon Web Services EC2 instance
+  - **Digital Ocean Droplet** - Digital Ocean virtual server
+  - Both options use Docker Compose for deployment
 
 ### Step 2: Create Project Directory Structure
 
@@ -93,7 +97,7 @@ Create a comprehensive feature document with:
 - Database: {PostgreSQL/Supabase}
 - Authentication: {Supabase Auth/NextAuth/etc}
 - Styling: {Tailwind CSS}
-- Deployment: Docker Compose (local), Digital Ocean (production)
+- Deployment: Docker Compose (local), {AWS EC2 | Digital Ocean Droplet} (production)
 
 ## Milestones
 1. **Foundation** - Project setup, authentication, basic UI
@@ -121,7 +125,7 @@ Status: COMPLETED
 - Created project directory structure
 - Generated feature specifications
 - Set up Docker Compose for local development
-- Created deployment scripts for Digital Ocean
+- Created deployment scripts for {AWS EC2 | Digital Ocean}
 - Initialized git repository
 
 #### Files Created:
@@ -294,15 +298,22 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-### Step 9: Create Digital Ocean Deployment Guide (docs/DEPLOYMENT.md)
+### Step 9: Create Cloud Deployment Guide (docs/DEPLOYMENT.md)
 
-Include:
-- Droplet setup instructions (Ubuntu 22.04 recommended)
-- Docker installation steps
+**Based on the user's cloud provider choice in Step 1, use the appropriate deployment template:**
+
+- **If AWS EC2**: Use the `DEPLOYMENT-AWS.md.template` from the plugin's `scripts/templates/` directory as the basis for `docs/DEPLOYMENT.md`. This covers EC2 instance setup, security groups, Elastic IP, Docker installation, and deployment with Docker Compose.
+
+- **If Digital Ocean**: Use the `DEPLOYMENT-DO.md.template` from the plugin's `scripts/templates/` directory as the basis for `docs/DEPLOYMENT.md`. This covers Droplet creation, firewall setup, Docker installation, and deployment with Docker Compose.
+
+Both templates include:
+- Server provisioning and initial setup
+- Docker and Docker Compose installation
 - SSL certificate setup with Certbot
 - Environment variable configuration
 - Deployment commands
 - Monitoring and maintenance tips
+- Security checklist
 
 ### Step 10: Create .env.example
 
@@ -333,7 +344,7 @@ git commit -m "Initial project setup with Docker Compose and deployment infrastr
 - Created project structure for {project-name}
 - Added Docker Compose for local development
 - Added production Docker configuration
-- Created deployment scripts for Digital Ocean
+- Created deployment scripts for {AWS EC2 | Digital Ocean}
 - Generated feature specifications
 - Set up Claude progress tracking
 
@@ -348,6 +359,7 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 4. **Document everything** thoroughly
 5. **Make scripts executable** with `chmod +x`
 6. **Never include actual secrets** in any file - use placeholders
+7. **Use the correct deployment template** based on the user's cloud provider choice
 
 ## Output Summary
 

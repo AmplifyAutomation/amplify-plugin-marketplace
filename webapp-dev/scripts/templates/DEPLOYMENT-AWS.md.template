@@ -1,0 +1,403 @@
+# Deployment Guide
+
+## {{PROJECT_NAME}} - Production Deployment
+
+This guide covers deploying your application to an AWS EC2 instance using Docker Compose.
+
+## Prerequisites
+
+- An AWS account
+- A domain name pointing to your server's IP address (or Elastic IP)
+- SSH access to your EC2 instance
+- Basic familiarity with Linux command line
+
+## AWS EC2 Instance Setup
+
+### 1. Launch an EC2 Instance
+
+1. Log in to the AWS Management Console
+2. Navigate to **EC2 > Launch Instance**
+3. Configure the instance:
+   - **Name**: {{PROJECT_NAME}}
+   - **AMI**: Ubuntu Server 22.04 LTS (HVM, SSD Volume Type)
+   - **Instance type**: t3.small (2 vCPU, 2GB RAM minimum recommended)
+   - **Key pair**: Create or select an existing SSH key pair
+   - **Network settings**: Create a new security group (see Step 2)
+   - **Storage**: 20GB gp3 (minimum)
+4. Click **Launch Instance**
+
+### 2. Configure Security Group
+
+Create or edit the security group with the following inbound rules:
+
+| Type  | Protocol | Port Range | Source    | Description          |
+|-------|----------|------------|-----------|----------------------|
+| SSH   | TCP      | 22         | Your IP   | SSH access           |
+| HTTP  | TCP      | 80         | 0.0.0.0/0 | HTTP traffic        |
+| HTTPS | TCP      | 443        | 0.0.0.0/0 | HTTPS traffic       |
+
+> **Tip**: Restrict SSH access to your IP address or a known CIDR block rather than 0.0.0.0/0.
+
+### 3. Allocate an Elastic IP (Recommended)
+
+1. Navigate to **EC2 > Elastic IPs**
+2. Click **Allocate Elastic IP address**
+3. Select the Elastic IP, click **Actions > Associate Elastic IP address**
+4. Select your EC2 instance and associate
+
+This ensures your server keeps the same public IP after restarts.
+
+### 4. Initial Server Setup
+
+SSH into your instance:
+
+```bash
+ssh -i /path/to/your-key.pem ubuntu@your_server_ip
+```
+
+Create a deploy user:
+
+```bash
+# Create user
+sudo adduser deploy
+sudo usermod -aG sudo deploy
+
+# Set up SSH for deploy user
+sudo mkdir -p /home/deploy/.ssh
+sudo cp ~/.ssh/authorized_keys /home/deploy/.ssh/
+sudo chown -R deploy:deploy /home/deploy/.ssh
+sudo chmod 700 /home/deploy/.ssh
+sudo chmod 600 /home/deploy/.ssh/authorized_keys
+```
+
+### 5. Install Docker
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Add deploy user to docker group
+sudo usermod -aG docker deploy
+
+# Install Docker Compose
+sudo apt install docker-compose-plugin -y
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+### 6. Configure Firewall (UFW)
+
+```bash
+# Enable UFW
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+```
+
+### 7. Set Up Application Directory
+
+```bash
+# Switch to deploy user
+su - deploy
+
+# Create application directory
+mkdir -p ~/apps/{{PROJECT_NAME}}
+cd ~/apps/{{PROJECT_NAME}}
+```
+
+## Deploy Application
+
+### 1. Transfer Files
+
+From your local machine:
+
+```bash
+# Option A: Using Git (recommended)
+# On server:
+git clone your-repo-url ~/apps/{{PROJECT_NAME}}
+
+# Option B: Using rsync
+rsync -avz --exclude 'node_modules' --exclude '.next' \
+  ./ deploy@your_server_ip:~/apps/{{PROJECT_NAME}}/
+```
+
+### 2. Create Production Environment File
+
+```bash
+cd ~/apps/{{PROJECT_NAME}}
+cp .env.example .env.production
+nano .env.production
+```
+
+Update with production values:
+
+```env
+# Database
+DB_USER=your_db_user
+DB_PASSWORD=your_secure_password
+DB_NAME={{PROJECT_NAME}}_prod
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+
+# App
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+NODE_ENV=production
+
+# Add other secrets as needed
+```
+
+### 3. Set Up Nginx Configuration
+
+Create `docker/nginx/conf.d/app.conf`:
+
+```nginx
+upstream nextjs {
+    server app:3000;
+}
+
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com www.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    location / {
+        proxy_pass http://nextjs;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Static files caching
+    location /_next/static {
+        proxy_pass http://nextjs;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}
+```
+
+### 4. Obtain SSL Certificate
+
+First, start nginx with HTTP only:
+
+```bash
+# Create initial nginx config for HTTP only
+# Then run certbot to obtain certificate
+
+docker compose -f docker-compose.prod.yml run --rm certbot \
+  certonly --webroot --webroot-path=/var/www/certbot \
+  --email your@email.com --agree-tos --no-eff-email \
+  -d yourdomain.com -d www.yourdomain.com
+```
+
+### 5. Start Application
+
+```bash
+# Build and start containers
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Check logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Verify containers are running
+docker compose -f docker-compose.prod.yml ps
+```
+
+## Maintenance
+
+### View Logs
+
+```bash
+# All services
+docker compose -f docker-compose.prod.yml logs -f
+
+# Specific service
+docker compose -f docker-compose.prod.yml logs -f app
+```
+
+### Update Application
+
+```bash
+cd ~/apps/{{PROJECT_NAME}}
+
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### Database Backup
+
+```bash
+# Create backup
+docker compose -f docker-compose.prod.yml exec db \
+  pg_dump -U $DB_USER $DB_NAME > backups/backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restore backup
+docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U $DB_USER $DB_NAME < backups/your_backup.sql
+```
+
+### SSL Certificate Renewal
+
+Certbot container automatically renews certificates. To manually renew:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm certbot renew
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+## AWS-Specific Operations
+
+### Instance Management
+
+```bash
+# Stop instance (from AWS CLI)
+aws ec2 stop-instances --instance-ids i-xxxxxxxxxxxx
+
+# Start instance
+aws ec2 start-instances --instance-ids i-xxxxxxxxxxxx
+
+# Reboot instance
+aws ec2 reboot-instances --instance-ids i-xxxxxxxxxxxx
+```
+
+### Monitoring with CloudWatch
+
+1. Navigate to **CloudWatch > Metrics > EC2**
+2. Enable detailed monitoring for CPU, network, and disk metrics
+3. Create alarms for:
+   - CPU utilization > 80%
+   - Status check failures
+   - Disk space usage
+
+### Setting Up CloudWatch Agent (Optional)
+
+```bash
+# Install CloudWatch agent
+sudo apt install amazon-cloudwatch-agent -y
+
+# Configure (use wizard)
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
+```
+
+### Create AMI Backup (Snapshot)
+
+1. Navigate to **EC2 > Instances**
+2. Select your instance
+3. Click **Actions > Image and templates > Create image**
+4. Name it `{{PROJECT_NAME}}-backup-YYYYMMDD`
+
+## Monitoring
+
+### Basic Health Check
+
+```bash
+curl -f http://localhost:3000/api/health || echo "App is down!"
+```
+
+### Set Up Monitoring (Optional)
+
+Consider setting up:
+- **Uptime monitoring**: UptimeRobot, Better Uptime
+- **Error tracking**: Sentry
+- **Log aggregation**: CloudWatch Logs, Papertrail, Logtail
+- **Server metrics**: CloudWatch, Netdata
+
+## Troubleshooting
+
+### Container won't start
+
+```bash
+# Check logs
+docker compose -f docker-compose.prod.yml logs app
+
+# Check container status
+docker compose -f docker-compose.prod.yml ps
+
+# Rebuild from scratch
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml up -d --build --force-recreate
+```
+
+### Database connection issues
+
+```bash
+# Check database is running
+docker compose -f docker-compose.prod.yml exec db pg_isready
+
+# Check connection from app container
+docker compose -f docker-compose.prod.yml exec app nc -zv db 5432
+```
+
+### Nginx SSL issues
+
+```bash
+# Test nginx config
+docker compose -f docker-compose.prod.yml exec nginx nginx -t
+
+# Reload nginx
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+### EC2 Instance Won't Connect
+
+```bash
+# Check security group allows SSH from your IP
+aws ec2 describe-security-groups --group-ids sg-xxxxxxxxxxxx
+
+# Check instance status
+aws ec2 describe-instance-status --instance-ids i-xxxxxxxxxxxx
+
+# If locked out, use EC2 Instance Connect from the AWS Console
+```
+
+## Security Checklist
+
+- [ ] SSH key authentication only (disable password auth)
+- [ ] Security group restricts SSH to known IPs
+- [ ] Firewall configured (UFW)
+- [ ] SSL certificate installed
+- [ ] Environment variables secured
+- [ ] Database not exposed to internet
+- [ ] Regular backups configured (AMI snapshots + DB dumps)
+- [ ] Security updates enabled (unattended-upgrades)
+- [ ] Strong database passwords
+- [ ] Application secrets rotated regularly
+- [ ] IAM role attached with least-privilege permissions (if using AWS services)
+- [ ] Elastic IP associated (prevents IP change on restart)

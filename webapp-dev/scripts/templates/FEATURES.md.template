@@ -28,7 +28,7 @@
 
 ### Deployment
 - **Local**: Docker Compose
-- **Production**: Digital Ocean Droplet
+- **Production**: {{CLOUD_PROVIDER}}
 
 ### Code Quality
 - TypeScript strict mode

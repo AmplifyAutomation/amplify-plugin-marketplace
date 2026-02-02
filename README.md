@@ -16,7 +16,7 @@ Or for permanent installation, add to your Claude Code settings.
 
 ### webapp-dev
 
-A two-stage agent system for building production-ready React and Next.js applications with Docker Compose local development and cloud-ready infrastructure.
+A two-stage agent system for building production-ready React and Next.js applications with Docker Compose local development and cloud deployment to AWS EC2 or Digital Ocean Droplets.
 
 #### Quick Start
 
@@ -32,7 +32,7 @@ The plugin uses two specialized agents:
 
 | Agent | Triggered When | Purpose |
 |-------|---------------|---------|
-| **initializer** | No progress file exists | Sets up new projects with Docker, deployment scripts, and feature planning |
+| **initializer** | No progress file exists | Sets up new projects with Docker, deployment scripts (AWS EC2 or Digital Ocean), and feature planning |
 | **coding** | Progress file exists | Continues development, tracks progress, implements features incrementally |
 
 **Detection logic:** Checks for `.claude/progress/claude-progress.txt`
@@ -43,10 +43,10 @@ The plugin uses two specialized agents:
 ```bash
 /build
 ```
-The initializer agent will ask about your project requirements, then create:
+The initializer agent will ask about your project requirements (including your preferred cloud provider), then create:
 - Project structure with Docker Compose
 - Feature specifications (`docs/FEATURES.md`)
-- Deployment configuration for Digital Ocean
+- Deployment configuration for your chosen provider (AWS EC2 or Digital Ocean)
 - Progress tracking system
 
 **Continuing development:**
